@@ -1,3 +1,48 @@
+Weblate 5.8.2
+-------------
+
+Not yet released.
+
+**New features**
+
+**Improvements**
+
+**Bug fixes**
+
+* Update outdated plural definitions during the database migration.
+* Reduced number of database queries when updating multiple strings.
+
+**Compatibility**
+
+**Upgrading**
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+**Contributors**
+
+.. include:: changes/contributors/5.8.2.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/129?closed=1>`__.
+
+Weblate 5.8.1
+-------------
+
+Released on October 15th 2024.
+
+**Bug fixes**
+
+* Use lower case name for the Python package.
+
+**Upgrading**
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+**Contributors**
+
+.. include:: changes/contributors/5.8.1.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/128?closed=1>`__.
+
 Weblate 5.8
 -----------
 
