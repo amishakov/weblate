@@ -38,6 +38,7 @@ from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
+    HTTP_400_BAD_REQUEST,
     HTTP_423_LOCKED,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -151,6 +152,12 @@ class LockedError(APIException):
     status_code = HTTP_423_LOCKED
     default_detail = gettext_lazy("Could not obtain the lock to perform the operation.")
     default_code = "unknown-locked"
+
+
+class NotSourceUnit(APIException):
+    status_code = HTTP_400_BAD_REQUEST
+    default_detail = gettext_lazy("Specified unit id is not a translation source unit.")
+    default_code = "not-a-source-unit"
 
 
 class WeblateExceptionHandler(ExceptionHandler):
@@ -626,6 +633,24 @@ class GroupViewSet(viewsets.ModelViewSet):
         serializer = self.serializer_class(obj, context={"request": request})
 
         return Response(serializer.data, status=HTTP_200_OK)
+
+    @extend_schema(
+        description="Delete a role from a group.",
+        methods=["delete"],
+        parameters=[OpenApiParameter("role_id", int, OpenApiParameter.PATH)],
+    )
+    @action(detail=True, methods=["delete"], url_path="roles/(?P<role_id>[0-9]+)")
+    def delete_roles(self, request: Request, id, role_id):  # noqa: A002
+        obj = self.get_object()
+        self.perm_check(request)
+
+        try:
+            role = obj.roles.get(pk=role_id)
+        except Role.DoesNotExist as error:
+            raise Http404(str(error)) from error
+
+        obj.roles.remove(role)
+        return Response(status=HTTP_204_NO_CONTENT)
 
     @extend_schema(description="Associate languages with a group.", methods=["post"])
     @action(
@@ -1562,7 +1587,9 @@ class MemoryViewSet(viewsets.ModelViewSet, DestroyModelMixin):
     def get_queryset(self):
         if not self.request.user.is_superuser:
             self.permission_denied(self.request, "Access not allowed")
-        return Memory.objects.order_by("id")
+        # Use default database connection and not memory_db one (in case
+        # a custom router is used).
+        return Memory.objects.using("default").order_by("id")
 
     def perm_check(self, request: Request, instance) -> None:
         if not request.user.has_perm("memory.delete", instance):
@@ -1996,6 +2023,23 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
                 status=HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return Response(status=HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def translations(self, request: Request, *args, **kwargs):
+        unit = self.get_object()
+        user = request.user
+        user.check_access_component(unit.translation.component)
+
+        if not unit.is_source:
+            raise NotSourceUnit
+
+        translation_units = (
+            unit.source_unit.unit_set.exclude(pk=unit.pk).prefetch().prefetch_full()
+        )
+        serializer = UnitSerializer(
+            translation_units, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
 
 
 @extend_schema_view(
